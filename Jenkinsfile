@@ -8,24 +8,24 @@ pipeline {
     stages {
         stage('Git Checkout') {
             steps {
-                // ambil kode dari repo Laravel
                 checkout scm
             }
         }
 
-       stage('Docker Run') {
-    steps {
-        sh "docker stop stunting-app || true"
-        sh "docker rm stunting-app || true"
-        //  mapping port 8080 di server ke port 80 di container
-        sh "docker run -d --name stunting-app -p 8080:80 ${DOCKER_IMAGE}:latest"
-    }
-}
+        stage('Install Dependencies') {
+            steps {
+                // Laravel butuh composer install sebelum di-scan atau di-build
+                sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
+                sh 'cp .env.example .env || true'
+                sh 'php artisan key:generate'
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    // SonarScanner untuk PHP
-                    def scannerHome = tool 'sonar' // nama sesuai di Global Tool Configuration
+                    // Pastikan di Manage Jenkins > Tools namanya adalah 'sonar'
+                    def scannerHome = tool 'sonar' 
                     withSonarQubeEnv('SonarQube') {
                         sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=stunting-laravel -Dsonar.sources=."
                     }
@@ -35,7 +35,6 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                // Membangun image Dockerfile Laravel
                 sh "docker build -t ${DOCKER_IMAGE}:latest ."
             }
         }
@@ -52,7 +51,7 @@ pipeline {
 
         stage('Docker Run') {
             steps {
-                // Menyesuaikan port Laravel port 80 atau 8000
+                // HANYA SATU STAGE RUN DI AKHIR
                 sh "docker stop stunting-app || true"
                 sh "docker rm stunting-app || true"
                 sh "docker run -d --name stunting-app -p 8080:80 ${DOCKER_IMAGE}:latest"
