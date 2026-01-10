@@ -13,15 +13,14 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                // Menggunakan Composer untuk Laravel
-                sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
-                sh 'cp .env.example .env || true'
-                sh 'php artisan key:generate'
-            }
-        }
-
+       stage('Docker Run') {
+    steps {
+        sh "docker stop stunting-app || true"
+        sh "docker rm stunting-app || true"
+        //  mapping port 8080 di server ke port 80 di container
+        sh "docker run -d --name stunting-app -p 8080:80 ${DOCKER_IMAGE}:latest"
+    }
+}
         stage('SonarQube Analysis') {
             steps {
                 script {
