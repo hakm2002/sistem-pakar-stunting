@@ -1,33 +1,44 @@
-# For Java 17, try this
-FROM openjdk:17-alpine
+# Menggunakan image PHP 8.2 dengan Apache
+FROM php:8.2-apache
 
-# Refer to Maven build -> finalName
-ARG JAR_FILE=target/sistem-pakar-stunting-0.0.1-SNAPSHOT.jar
+# 1. Install dependencies sistem yang dibutuhkan Laravel
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    zip \
+    unzip \
+    git \
+    libzip-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_mysql gd zip
 
-EXPOSE 8090
-# cd /opt/app
-WORKDIR /opt/app
+# 2. Aktifkan modul Apache Rewrite untuk routing
+RUN a2enmod rewrite
 
-# cp target/springboot-3-0.0.1-SNAPSHOT.jar /opt/app/app.jar
-COPY ${JAR_FILE} app.jar
+# 3. Atur Document Root Apache ke folder 'public' Laravel
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
-# java -jar /opt/app/app.jar
-ENTRYPOINT ["java","-jar","app.jar"]
+# 4. Set working directory
+WORKDIR /var/www/html
 
-#docker command
-# docker build -t <repository _name >:<tag> .    ==> docker build -t springboot-3.0:SNAPSHOOT-0.0.1    --> for create docker image
-# docker image ls    --> for look docker image
-# docker rmi <image_id>    ==> docker rmi f9e76994174d    --> for delete docr image
-# docker ps -a    -> for look all container active / inactive
-# docker stop <container_id>    ==> docker stop d0308bcd2b28    --> for stop docker container
-# docker rm <container_id>    ==> docker rm d0308bcd2b28    --> for delete docker container
-# docker run -d --name <container_name> -p <expose_port>:<properites_port> <image_name>:<image_port>    ==> docker run -d --name springboot-3.0 -p 8099:8080 springboot-3.0 ----> for running container docker
-# docker run --rm -p 8099:8099 rnd-springboot-3.0
+# 5. Copy seluruh file project ke dalam container
+COPY . .
 
-# docker tag <image_name>:<tag> <username>/<image_name>:<tag>    --> docker tag rnd-springboot-3.0:latest septianreza/rnd-springboot-3.0:latest   ==> untuk membuat tag yang akan di push ke docker hub
-# docker push <username>/<image_name>:<tag>    --> docker push septianreza/rnd-springboot-3.0:latest    ==> untuk push image ke docker hub
+# 6. Install Composer (Untuk manajemen library PHP)
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
+# 7. Jalankan install dependencies (tanpa library dev untuk memperkecil ukuran image)
+RUN composer install --no-interaction --optimize-autoloader --no-dev
 
-# for running sonar
-# docker run -d --name sonarqube -p 9000:9000 -p 9092:9092 sonarqube
-# mvn clean verify sonar:sonar -Dsonar.projectKey=springboot-3 -Dsonar.projectName='springboot-3' -Dsonar.host.url=http://localhost:9000 -Dsonar.token=sqp_f46184d90a5b2afe773b44071ace8c0127281067
+# 8. Berikan izin akses folder storage dan cache (Sangat Penting di Laravel)
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# 9. Expose port 80
+EXPOSE 80
+
+# 10. Jalankan Apache di foreground
+CMD ["apache2-foreground"]
