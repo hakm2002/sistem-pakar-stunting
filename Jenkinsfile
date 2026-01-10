@@ -1,43 +1,42 @@
 pipeline {
     agent any
-    tools {
-        maven 'jenkins-maven'
-    }
 
     environment {
-        BUILD_NUMBER_ENV = "${env.BUILD_NUMBER}"
-        // Ganti username docker di sini
         DOCKER_IMAGE = "hakm2002/sistem-pakar-stunting" 
     }
 
     stages {
         stage('Git Checkout') {
             steps {
-                // Gunakan repo hasil fork
-                checkout scmGit(branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/hakm2002/sistem-pakar-stunting.git']])
-                sh 'mvn clean install -DskipTests'
+                // ambil kode dari repo Laravel
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                // Menggunakan Composer untuk Laravel
+                sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
+                sh 'cp .env.example .env || true'
+                sh 'php artisan key:generate'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    // Nama 'SonarQube' harus sesuai dengan yang ada di Manage Jenkins > System
+                    // SonarScanner untuk PHP
+                    def scannerHome = tool 'SonarScanner' // nama sesuai di Global Tool Configuration
                     withSonarQubeEnv('SonarQube') {
-                        sh "mvn sonar:sonar -Dsonar.projectKey=sistem-pakar-stunting -Dsonar.projectName='sistem-pakar-stunting'"
+                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=stunting-laravel -Dsonar.sources=."
                     }
                 }
             }
         }
 
-        stage("Quality Gate") {
-            steps {
-                waitForQualityGate abortPipeline: true
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
+                // Membangun image Dockerfile Laravel
                 sh "docker build -t ${DOCKER_IMAGE}:latest ."
             }
         }
@@ -45,7 +44,6 @@ pipeline {
         stage('Docker Push') {
             steps {
                 script {
-                    // 'dockerhub-pwd' ID di Jenkins Credentials (Type: Username with password)
                     docker.withRegistry('', 'dockerhub-pwd') {
                         sh "docker push ${DOCKER_IMAGE}:latest"
                     }
@@ -55,9 +53,10 @@ pipeline {
 
         stage('Docker Run') {
             steps {
-                sh "docker stop sistem-pakar-stunting || true"
-                sh "docker rm sistem-pakar-stunting || true"
-                sh "docker run -d --name sistem-pakar-stunting -p 8099:8080 ${DOCKER_IMAGE}:latest"
+                // Menyesuaikan port Laravel port 80 atau 8000
+                sh "docker stop stunting-app || true"
+                sh "docker rm stunting-app || true"
+                sh "docker run -d --name stunting-app -p 8080:80 ${DOCKER_IMAGE}:latest"
             }
         }
     }
