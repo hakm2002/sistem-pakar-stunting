@@ -26,7 +26,7 @@ pipeline {
             steps {
                 script {
                     // SonarScanner untuk PHP
-                    def scannerHome = tool 'SonarScanner' // nama sesuai di Global Tool Configuration
+                    def scannerHome = tool 'sonar' // nama sesuai di Global Tool Configuration
                     withSonarQubeEnv('SonarQube') {
                         sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=stunting-laravel -Dsonar.sources=."
                     }
