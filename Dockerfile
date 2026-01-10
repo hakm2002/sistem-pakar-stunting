@@ -12,32 +12,37 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_mysql gd zip
 
+# 2. Aktifkan Apache Rewrite Module
 RUN a2enmod rewrite
 
+# 3. Konfigurasi Apache Document Root ke folder public Laravel
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
 WORKDIR /var/www/html
 
-# 2. Copy seluruh file terlebih dahulu (Termasuk .env yang sudah dibuat di Jenkins)
+# 4. Copy seluruh file project
 COPY . .
 
-# 3. Pastikan file .env ada agar artisan tidak error
+# 5. Siapkan file .env (menggunakan example jika tidak ada)
 RUN cp .env.example .env || true
 
-# 4. Install Composer
+# 6. Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# 5. Jalankan composer install
-# Tambahkan flag --no-scripts agar artisan tidak dijalankan sebelum autoloader siap
+# 7. Install Dependencies (Tanpa dev-dependencies dan tanpa menjalankan script artisan otomatis)
 RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts
 
-# 6. Jalankan manual script yang tadi gagal
-RUN php artisan package:discover --ansi
+# 8. MEMBERSIHKAN CACHE & DISCOVER PACKAGES
+# Ini langkah krusial untuk menghapus jejak Clockwork/dev-tools dari cache yang terikut ter-copy
+RUN rm -f bootstrap/cache/config.php bootstrap/cache/services.php bootstrap/cache/packages.php \
+    && php artisan package:discover --ansi
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# 9. Atur Izin Akses Folder (Permission)
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
+# 10. Expose port 80 dan jalankan Apache
 EXPOSE 80
 CMD ["apache2-foreground"]
