@@ -45,7 +45,7 @@ pipeline {
                 // PERBAIKAN UTAMA DI SINI:
                 // Mengganti docker.withRegistry dengan withCredentials + sh
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub-pwd', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         // Login manual lewat shell
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
                         // Push image
