@@ -34,8 +34,8 @@ RUN cp .env.example .env || true
 # 7. Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# 8. Install Dependencies (Hanya production, mengabaikan paket dev seperti Clockwork)
-RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts
+# 8. Install Dependencies (Gunakan flag --no-dev dari awal agar lebih ringan)
+RUN composer install --no-interaction --optimize-autoloader --no-dev --no-scripts --prefer-dist
 
 # 9. MEMBERSIHKAN CACHE & DISCOVER PACKAGES
 # Menghapus file cache lama yang mungkin terbawa saat COPY . .
