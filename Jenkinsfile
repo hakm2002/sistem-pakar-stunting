@@ -14,8 +14,6 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                // Pastikan PHP & Composer terinstall di server Jenkins (Host)
-                // Langkah ini diperlukan agar SonarQube bisa membaca codingan lengkap
                 sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
                 sh 'cp .env.example .env || true'
                 sh 'php artisan key:generate'
@@ -35,20 +33,16 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                // Menggunakan sh biasa (lebih aman dari error plugin)
                 sh "docker build -t ${DOCKER_IMAGE}:latest ."
             }
         }
 
         stage('Docker Push') {
             steps {
-                // PERBAIKAN UTAMA DI SINI:
-                // Mengganti docker.withRegistry dengan withCredentials + sh
                 script {
+                    // Pastikan ID ini 'docker-hub' sesuai yang ada di menu Credentials Jenkins Anda
                     withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        // Login manual lewat shell
                         sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                        // Push image
                         sh "docker push ${DOCKER_IMAGE}:latest"
                     }
                 }
@@ -57,12 +51,14 @@ pipeline {
 
         stage('Docker Run') {
             steps {
-                // Hentikan container lama jika ada, lalu jalankan yang baru
+                // 1. Bersihkan container lama
                 sh "docker stop stunting-app || true"
                 sh "docker rm stunting-app || true"
 
+                // 2. Jalankan container baru (Perhatikan struktur rapi ini)
+                // Kita gunakan """ (titik tiga) agar bisa multi-line
                 sh """
-                sh "docker run -d --name stunting-app -p 8081:80 ${DOCKER_IMAGE}:latest"
+                docker run -d --name stunting-app -p 8081:80 \
                 --network docker-laravel-mysql-nginx-starter_laravel \
                 -e DB_HOST=mysql \
                 -e DB_PORT=3306 \
@@ -71,17 +67,22 @@ pipeline {
                 -e DB_PASSWORD=root \
                 ${DOCKER_IMAGE}:latest
                 """
-                "sh sleep 5"
+
+                // 3. Tunggu sebentar agar database connect
+                sh "sleep 5"
+
+                // 4. Setup Laravel
                 sh "docker exec -i stunting-app php artisan key:generate"
                 sh "docker exec -i stunting-app php artisan config:cache"
-                sh "docker exec -i stunting-app php artisan migrate
+                
+                // 5. Migrate Database (Perbaikan: tanda kutip penutup sudah ditambahkan)
+                sh "docker exec -i stunting-app php artisan migrate --force"
             }
         }
     }
     
     post {
         always {
-            // Logout agar kredensial aman
             sh 'docker logout || true'
         }
     }
