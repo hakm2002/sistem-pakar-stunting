@@ -1,5 +1,10 @@
-vendor/
-node_modules/
-.git/
+.git
 .env
-storage/*.zip
+vendor
+node_modules
+storage/*.key
+public/storage
+public/hot
+tests
+phpunit.xml
+README.md
