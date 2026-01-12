@@ -60,7 +60,7 @@ pipeline {
                 // Hentikan container lama jika ada, lalu jalankan yang baru
                 sh "docker stop stunting-app || true"
                 sh "docker rm stunting-app || true"
-                sh "docker run -d --name stunting-app -p 8080:80 ${DOCKER_IMAGE}:latest"
+                sh "docker run -d --name stunting-app -p 8081:80 ${DOCKER_IMAGE}:latest"
             }
         }
     }
