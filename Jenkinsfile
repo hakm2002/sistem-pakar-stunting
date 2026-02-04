@@ -3,6 +3,9 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "hakm2002/sistem-pakar-stunting"
+        // Kita panggil token dari Jenkins Credentials ke variabel environment
+        // Ganti 'sonar-token' dengan ID yang Anda buat di Manage Jenkins > Credentials
+        SONAR_TOKEN = credentials('sistem-pakar') 
     }
 
     stages {
@@ -29,10 +32,16 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    def scannerHome = tool 'sonar-scanner' 
-                    // Pastikan nama 'SonarQube' di bawah ini sama dengan nama di Manage Jenkins > System
+                    def scannerHome = tool 'sonar-scanner'
+                    // Gunakan block withSonarQubeEnv untuk URL server
+                    // Dan tambahkan parameter -Dsonar.login secara eksplisit
                     withSonarQubeEnv('SonarQube') {
-                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=stunting-laravel -Dsonar.sources=."
+                        sh """
+                        ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=stunting-laravel \
+                        -Dsonar.sources=. \
+                        -Dsonar.login=${SONAR_TOKEN}
+                        """
                     }
                 }
             }
@@ -85,7 +94,5 @@ pipeline {
         always {
             sh 'docker logout || true'
         }
-        success { echo 'Deployment Berhasil!' }
-        failure { echo 'Deployment Gagal, periksa log di atas.' }
     }
 }
