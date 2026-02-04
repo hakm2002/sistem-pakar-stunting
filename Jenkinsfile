@@ -38,7 +38,7 @@ pipeline {
                     withSonarQubeEnv('SonarQube') {
                         sh """
                         ${scannerHome}/bin/sonar-scanner \
-                        -Dsonar.projectKey=stunting-laravel \
+                        -Dsonar.projectKey=sistem-pakar-stunting \
                         -Dsonar.sources=. \
                         -Dsonar.login=${SONAR_TOKEN}
                         """
