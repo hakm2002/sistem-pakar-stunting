@@ -14,6 +14,7 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
+                sh 'curl -sS https://getcomposer.org/installer | php'
                 sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
                 sh 'cp .env.example .env || true'
                 sh 'php artisan key:generate'
