@@ -31,15 +31,18 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            steps {
-                script {
-                    def scannerHome = tool 'sonar-scanner' 
-                    withSonarQubeEnv('SonarQube') {
-                        sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=stunting-laravel -Dsonar.sources=."
-                    }
-                }
+            stage('SonarQube Analysis') {
+    steps {
+        script {
+            def scannerHome = tool 'sonar-scanner' 
+            // withSonarQubeEnv secara otomatis mengambil URL dan Token 
+            // yang sudah Anda setting di Jenkins System Configuration
+            withSonarQubeEnv('SonarQube') {
+                sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=stunting-laravel -Dsonar.sources=."
             }
         }
+    }
+}
 
         stage('Build Docker Image') {
             steps {
