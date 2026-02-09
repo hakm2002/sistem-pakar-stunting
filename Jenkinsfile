@@ -71,7 +71,7 @@ pipeline {
                     sh "docker rm stunting-app || true"
 
                     sh """
-                    docker run -d --name stunting-app -p 8081:80 \
+                    docker run -d --name stunting-app -p 8082:80 \
                     --network docker-laravel-mysql-nginx-starter_laravel \
                     -e DB_HOST=mysql \
                     -e DB_PORT=3306 \
