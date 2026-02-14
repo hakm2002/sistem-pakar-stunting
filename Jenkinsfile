@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_USER  = "dockerdevopsethos"
+        DOCKER_USER  = "hakm2002"
         APP_NAME     = "sistem-pakar-stunting"
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
@@ -47,25 +47,34 @@ pipeline {
             }
         }
 
-        // --- STAGE 3 (FIXED: ARM64 SUPPORT) ---
+        // --- STAGE 3: SOLUSI FINAL UNTUK ARM64 ---
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    echo "📡 Menjalankan SonarScanner (Image: cirepo - ARM64 Support)..."
+                    echo "📡 Menyiapkan SonarScanner Universal..."
                     
-                    // Kita gunakan image 'cirepo/sonar-scanner-cli' yang support ARM64
-                    // Kita juga tambahkan parameter manual (-D) agar scan jalan meski tidak ada sonar-project.properties
+                    // Kita gunakan image Java resmi (eclipse-temurin) yang support ARM64
+                    // Kita download Scanner versi ZIP (Universal) yang ringan
                     withSonarQubeEnv('SonarQube') { 
                         sh """
                             docker run --rm \
                             -v "${WORKSPACE}:/usr/src" \
                             -e SONAR_HOST_URL="\${SONAR_HOST_URL}" \
                             -e SONAR_TOKEN="\${SONAR_AUTH_TOKEN}" \
-                            cirepo/sonar-scanner-cli \
-                            -Dsonar.projectKey=${APP_NAME} \
-                            -Dsonar.sources=. \
-                            -Dsonar.host.url="\${SONAR_HOST_URL}" \
-                            -Dsonar.login="\${SONAR_AUTH_TOKEN}"
+                            eclipse-temurin:17-jdk \
+                            sh -c "
+                                apt-get update && apt-get install -y unzip curl && \
+                                cd /tmp && \
+                                curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006.zip && \
+                                unzip -q sonar-scanner.zip && \
+                                mv sonar-scanner-*-linux sonar-scanner || mv sonar-scanner-* sonar-scanner && \
+                                echo '🚀 Menjalankan Scan...' && \
+                                /tmp/sonar-scanner/bin/sonar-scanner \
+                                -Dsonar.projectKey=${APP_NAME} \
+                                -Dsonar.sources=/usr/src \
+                                -Dsonar.host.url=\${SONAR_HOST_URL} \
+                                -Dsonar.login=\${SONAR_TOKEN}
+                            "
                         """
                     }
                 }
