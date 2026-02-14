@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // --- CONFIG ---
-        DOCKER_USER  = "hakm2002"
+        DOCKER_USER  = "dockerdevopsethos"
         APP_NAME     = "sistem-pakar-stunting"
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
@@ -28,7 +28,6 @@ pipeline {
                     branches: [[name: '*/main']], 
                     userRemoteConfigs: [[
                         url: 'https://github.com/hakm2002/sistem-pakar-stunting.git'
-                        // Menggunakan HTTPS dulu agar tidak perlu SSH Credential untuk git clone
                     ]]
                 ])
             }
@@ -36,22 +35,17 @@ pipeline {
 
         stage('2. Install Dependencies & Test') {
             steps {
-                // Cek environment
                 sh 'php -v'
                 sh 'composer -V'
-
-                // Install & Test
                 sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
-                // Pastikan ada file phpunit.xml, jika tidak ada, comment baris bawah ini:
+                // Gunakan "|| true" agar pipeline tidak berhenti total jika unit test gagal saat development
                 sh './vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=test-report.xml || true' 
-                // "|| true" agar pipeline tidak berhenti jika test gagal (opsional, untuk debugging)
             }
         }
 
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    // Pastikan tool 'SonarScanner' sudah terinstall di Global Tool Configuration
                     def scannerHome = tool 'SonarScanner' 
                     withSonarQubeEnv('SonarQube') { 
                         sh "${scannerHome}/bin/sonar-scanner"
@@ -64,7 +58,6 @@ pipeline {
             steps {
                 script {
                     timeout(time: 2, unit: 'MINUTES') {
-                        // abortPipeline: true artinya kalau quality gate merah, stop proses
                         waitForQualityGate abortPipeline: true
                     }
                 }
@@ -87,51 +80,30 @@ pipeline {
                 }
             }
         }
-
-        /* ===================================================================
-        STAGE 6 DI-SKIP (COMMENTED OUT) UNTUK LOCAL TESTING
-        ===================================================================
-        stage('6. Deploy Production (SSH)') {
-            steps {
-                sshagent([SSH_CREDS_ID]) {
-                    script {
-                        def secretContent = readFile(file: ENV_SECRET)
-                        def finalEnvContent = "${secretContent}\nFULL_IMAGE_NAME=${LATEST_TAG}"
-                        writeFile file: '.env', text: finalEnvContent
-
-                        sh "ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} 'mkdir -p ${DEPLOY_DIR}'"
-                        sh "scp -o StrictHostKeyChecking=no docker-compose.prod.yml .env ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_DIR}/"
-                        
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_HOST} '
-                                cd ${DEPLOY_DIR}
-                                docker compose -f docker-compose.prod.yml down --remove-orphans
-                                docker compose -f docker-compose.prod.yml pull
-                                docker compose -f docker-compose.prod.yml up -d
-                            '
-                        """
-                    }
-                }
-            }
-        }
-        */
+        
+        // Stage 6 Deploy di-skip dulu sesuai request
     }
         
     post {
         always {
-            script {
-                echo "🧹 Cleaning up..."
-                // Menggunakan try-catch agar error cleanup tidak membingungkan log utama
-                try {
-                    if (env.IMAGE_TAG) {
-                        sh "docker rmi ${IMAGE_TAG} || true"
+            // --- FIX UTAMA DISINI ---
+            // Kita bungkus dengan 'node' agar sh command punya konteks tempat berjalan
+            node {
+                script {
+                    echo "🧹 Cleaning up..."
+                    try {
+                        // Cek apakah image tag ada isinya sebelum menghapus
+                        if (env.IMAGE_TAG) {
+                            sh "docker rmi ${IMAGE_TAG} || true"
+                        }
+                        sh "docker image prune -f"
+                    } catch (Exception e) {
+                        echo "⚠️ Cleanup warning: ${e.getMessage()}"
                     }
-                    sh "docker image prune -f"
-                } catch (Exception e) {
-                    echo "⚠️ Warning: Cleanup failed but ignoring it. ${e}"
                 }
+                // cleanWs() juga butuh node context
+                cleanWs()
             }
-            cleanWs()
         }
         success {
             echo "✅ Build & Push Docker Berhasil!"
