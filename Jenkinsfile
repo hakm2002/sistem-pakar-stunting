@@ -47,7 +47,6 @@ pipeline {
             }
         }
 
-        // --- STAGE 3 FIXED: LOGIC PATH & PERMISSIONS ---
         stage('3. SonarQube Analysis') {
             steps {
                 script {
@@ -59,27 +58,29 @@ pipeline {
                             -v "${WORKSPACE}:/usr/src" \
                             -w /usr/src \
                             -e SONAR_HOST_URL="\${SONAR_HOST_URL}" \
-                            -e SONAR_TOKEN="\${SONAR_TOKEN}" \
+                            -e SONAR_TOKEN="\${SONAR_AUTH_TOKEN}" \
                             eclipse-temurin:17-jdk \
                             sh -c "
                                 # 1. Install Unzip & Curl
                                 apt-get update && apt-get install -y unzip curl && \
                                 
-                                # 2. Download Scanner ke folder /tmp
+                                # 2. Download Scanner
                                 curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006.zip && \
                                 unzip -q /tmp/sonar-scanner.zip -d /opt && \
                                 
-                                # 3. Jalankan Scanner
-                                # Penting: Kita jalankan DARI folder /usr/src agar report-task.txt muncul disitu
+                                # 3. RENAME folder hasil extract (INI PERBAIKANNYA)
+                                # Apapun nama foldernya, kita ubah jadi /opt/sonar-scanner
+                                mv /opt/sonar-scanner-* /opt/sonar-scanner && \
+                                
+                                # 4. Jalankan Scanner (Panggil path baru)
                                 echo '🚀 Starting Scan...' && \
-                                /opt/sonar-scanner-*-linux/bin/sonar-scanner \
+                                /opt/sonar-scanner/bin/sonar-scanner \
                                 -Dsonar.projectKey=${APP_NAME} \
                                 -Dsonar.sources=. \
                                 -Dsonar.host.url=\${SONAR_HOST_URL} \
                                 -Dsonar.login=\${SONAR_TOKEN} && \
                                 
-                                # 4. PENTING: Fix Permissions
-                                # Ubah pemilik folder .scannerwork agar bisa dibaca oleh Jenkins di luar container
+                                # 5. Fix Permissions
                                 chown -R \$(id -u):\$(id -g) .scannerwork
                             "
                         """
