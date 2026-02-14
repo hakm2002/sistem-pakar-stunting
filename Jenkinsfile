@@ -47,33 +47,40 @@ pipeline {
             }
         }
 
-        // --- STAGE 3: SOLUSI FINAL UNTUK ARM64 ---
+        // --- STAGE 3 FIXED: LOGIC PATH & PERMISSIONS ---
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    echo "📡 Menyiapkan SonarScanner Universal..."
+                    echo "📡 Menyiapkan SonarScanner Universal (Fixed Path)..."
                     
-                    // Kita gunakan image Java resmi (eclipse-temurin) yang support ARM64
-                    // Kita download Scanner versi ZIP (Universal) yang ringan
                     withSonarQubeEnv('SonarQube') { 
                         sh """
                             docker run --rm \
                             -v "${WORKSPACE}:/usr/src" \
+                            -w /usr/src \
                             -e SONAR_HOST_URL="\${SONAR_HOST_URL}" \
-                            -e SONAR_TOKEN="\${SONAR_AUTH_TOKEN}" \
+                            -e SONAR_TOKEN="\${SONAR_TOKEN}" \
                             eclipse-temurin:17-jdk \
                             sh -c "
+                                # 1. Install Unzip & Curl
                                 apt-get update && apt-get install -y unzip curl && \
-                                cd /tmp && \
-                                curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006.zip && \
-                                unzip -q sonar-scanner.zip && \
-                                mv sonar-scanner-*-linux sonar-scanner || mv sonar-scanner-* sonar-scanner && \
-                                echo '🚀 Menjalankan Scan...' && \
-                                /tmp/sonar-scanner/bin/sonar-scanner \
+                                
+                                # 2. Download Scanner ke folder /tmp
+                                curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006.zip && \
+                                unzip -q /tmp/sonar-scanner.zip -d /opt && \
+                                
+                                # 3. Jalankan Scanner
+                                # Penting: Kita jalankan DARI folder /usr/src agar report-task.txt muncul disitu
+                                echo '🚀 Starting Scan...' && \
+                                /opt/sonar-scanner-*-linux/bin/sonar-scanner \
                                 -Dsonar.projectKey=${APP_NAME} \
-                                -Dsonar.sources=/usr/src \
+                                -Dsonar.sources=. \
                                 -Dsonar.host.url=\${SONAR_HOST_URL} \
-                                -Dsonar.login=\${SONAR_TOKEN}
+                                -Dsonar.login=\${SONAR_TOKEN} && \
+                                
+                                # 4. PENTING: Fix Permissions
+                                # Ubah pemilik folder .scannerwork agar bisa dibaca oleh Jenkins di luar container
+                                chown -R \$(id -u):\$(id -g) .scannerwork
                             "
                         """
                     }
