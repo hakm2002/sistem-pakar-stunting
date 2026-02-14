@@ -47,14 +47,15 @@ pipeline {
             }
         }
 
-       stage('3. SonarQube Analysis') {
+      // --- STAGE 3: SONARQUBE (FIXED TOKEN VARIABLE) ---
+        stage('3. SonarQube Analysis') {
             steps {
                 script {
                     echo "📡 Menjalankan SonarScanner (Mode Ringan - No SCM)..."
                     
                     withSonarQubeEnv('SonarQube') {
                         sh """
-                            # 1. Bersihkan
+                            # 1. Bersihkan sisa sebelumnya
                             rm -rf .scannerwork sonar-scanner
                             
                             # 2. Download Scanner
@@ -63,21 +64,18 @@ pipeline {
                             mv sonar-scanner-5.0.1.3006 sonar-scanner
                             chmod +x sonar-scanner/bin/sonar-scanner
                             
-                            # 3. Jalankan Scanner dengan Opsi Hemat Resource
+                            # 3. Jalankan Scanner
+                            # PERBAIKAN: Menggunakan SONAR_AUTH_TOKEN (bukan SONAR_TOKEN)
                             echo "🚀 Starting Scan..."
                             ./sonar-scanner/bin/sonar-scanner \
                             -Dsonar.projectKey=${APP_NAME} \
                             -Dsonar.sources=. \
                             -Dsonar.host.url=\${SONAR_HOST_URL} \
-                            -Dsonar.token=\${SONAR_TOKEN} \
+                            -Dsonar.token=\${SONAR_AUTH_TOKEN} \
                             -Dsonar.scm.disabled=true \
                             -Dsonar.cpd.exclusions=**/* \
                             -Dsonar.branch.autoconfig.disabled=true
                         """
-                        // Penjelasan Flag Baru:
-                        // -Dsonar.scm.disabled=true        -> JANGAN cek history Git (Hemat RAM besar!)
-                        // -Dsonar.cpd.exclusions=**/* -> JANGAN cek duplikasi kode (Hemat CPU)
-                        // -Dsonar.token=...                -> Menggantikan sonar.login yang deprecated
                     }
                 }
             }
