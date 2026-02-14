@@ -3,12 +3,10 @@ pipeline {
 
     environment {
         // --- CONFIG ---
-        DOCKER_USER  = "dockerdevopsethos"
+        DOCKER_USER  = "hakm2002"
         APP_NAME     = "sistem-pakar-stunting"
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
-        
-        // --- CREDENTIALS ID ---
         DOCKER_CREDS = credentials('dockerhub-id-hakm')
     }
 
@@ -26,33 +24,31 @@ pipeline {
             }
         }
 
-        // --- BAGIAN INI SANGAT PENTING ---
         stage('2. Install Dependencies & Test') {
-            agent {
-                docker {
-                    // Kita meminjam komputer (container) lain yang sudah ada PHP & Composer
-                    image 'composer:2' 
-                    // reuseNode true agar lebih cepat
-                    reuseNode true 
-                }
-            }
             steps {
-                // Perintah ini sekarang akan jalan karena dijalankan di dalam container composer
-                sh 'php -v'
-                sh 'composer -V'
-                
-                // Gunakan ignore-platform-reqs untuk menghindari masalah ekstensi PHP yang kurang di image standar
-                sh 'composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs'
-                
-                // Jalankan unit test (menggunakan || true agar pipeline tidak stop jika test codingan gagal)
-                sh './vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=test-report.xml || true' 
+                script {
+                    echo "🚀 Menjalankan PHP & Composer menggunakan Docker Container (Manual)..."
+                    
+                    // --- PERUBAHAN UTAMA DI SINI ---
+                    // Kita jalankan container 'composer:2' secara manual
+                    // -v ${WORKSPACE}:/app  -> Mapping folder project Jenkins ke folder /app di container
+                    // -w /app               -> Masuk ke folder /app
+                    // sh -c "..."           -> Jalankan perintah php & composer
+                    
+                    sh """
+                        docker run --rm --user \$(id -u):\$(id -g) \
+                        -v ${WORKSPACE}:/app \
+                        -w /app \
+                        composer:2 \
+                        sh -c "php -v && composer -V && composer install --ignore-platform-reqs --no-interaction --prefer-dist && ./vendor/bin/phpunit || true"
+                    """
+                }
             }
         }
 
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    // Pastikan tool 'SonarScanner' sudah disetting di Global Tool Configuration
                     def scannerHome = tool 'SonarScanner' 
                     withSonarQubeEnv('SonarQube') { 
                         sh "${scannerHome}/bin/sonar-scanner"
@@ -75,7 +71,6 @@ pipeline {
             steps {
                 script {
                     echo "🐳 Building Docker Image..."
-                    // Build image aplikasi (akan menggunakan Dockerfile repo Anda)
                     sh "docker build -t ${IMAGE_TAG} ."
                     sh "docker tag ${IMAGE_TAG} ${LATEST_TAG}"
                     
@@ -92,16 +87,13 @@ pipeline {
         
     post {
         always {
-            // Script cleanup ini sudah diperbaiki dan terbukti berhasil di log terakhir Anda
             script {
                 try {
                     node {
                         echo "🧹 Cleaning up..."
-                        // Hapus image spesifik build ini jika ada
                         if (env.IMAGE_TAG) {
                            sh "docker rmi ${env.IMAGE_TAG} || true"
                         }
-                        // Bersihkan image sampah (dangling)
                         sh "docker image prune -f"
                         cleanWs()
                     }
