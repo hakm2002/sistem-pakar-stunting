@@ -27,9 +27,6 @@ pipeline {
             steps {
                 script {
                     echo "🚀 Menjalankan PHP Environment..."
-                    
-                    // Logic: Cek dulu apakah ada composer.json
-                    // Jika ada, install. Jika tidak, skip.
                     sh """
                         docker run --rm --user \$(id -u):\$(id -g) \
                         -v ${WORKSPACE}:/app \
@@ -50,20 +47,22 @@ pipeline {
             }
         }
 
+        // --- FIX STAGE 3 MENGGUNAKAN DOCKER ---
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    // PENTING: Pastikan Anda sudah setting Tool 'SonarScanner' di Manage Jenkins -> Tools
-                    // Sesuai langkah No.1 di panduan saya.
-                    try {
-                        def scannerHome = tool 'SonarScanner' 
-                        withSonarQubeEnv('SonarQube') { 
-                            sh "${scannerHome}/bin/sonar-scanner"
-                        }
-                    } catch (Exception e) {
-                        echo "❌ ERROR: Tool 'SonarScanner' tidak ditemukan."
-                        echo "👉 Harap ke Manage Jenkins -> Tools -> Add SonarQube Scanner -> Beri nama 'SonarScanner'"
-                        error("Pipeline Stopped: SonarScanner Tool missing")
+                    echo "📡 Menjalankan SonarScanner via Docker..."
+                    
+                    // Pastikan nama 'SonarQube' di dalam kurung ini SAMA PERSIS 
+                    // dengan nama Server yang ada di 'Manage Jenkins -> System -> SonarQube servers'
+                    withSonarQubeEnv('SonarQube') { 
+                        sh """
+                            docker run --rm \
+                            -v "${WORKSPACE}:/usr/src" \
+                            -e SONAR_HOST_URL="\${SONAR_HOST_URL}" \
+                            -e SONAR_TOKEN="\${SONAR_AUTH_TOKEN}" \
+                            sonarsource/sonar-scanner-cli
+                        """
                     }
                 }
             }
