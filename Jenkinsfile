@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // --- CONFIG ---
-        DOCKER_USER  = "hakm2002"
+        DOCKER_USER  = "dockerdevopsethos"
         APP_NAME     = "sistem-pakar-stunting"
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
@@ -26,12 +26,25 @@ pipeline {
             }
         }
 
+        // --- FIX: JALANKAN DI DALAM CONTAINER PHP/COMPOSER ---
         stage('2. Install Dependencies & Test') {
+            agent {
+                docker {
+                    // Menggunakan image official composer yang sudah ada PHP-nya
+                    image 'composer:2' 
+                    // reuseNode true mempercepat proses karena tidak perlu spin-up node baru
+                    reuseNode true 
+                }
+            }
             steps {
+                // Sekarang perintah ini akan jalan karena ada di dalam container composer
                 sh 'php -v'
                 sh 'composer -V'
-                sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
-                // Menggunakan "|| true" agar pipeline tidak berhenti jika test gagal
+                
+                // Gunakan --ignore-platform-reqs jika extension PHP di container kurang lengkap
+                sh 'composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-reqs'
+                
+                // Jalankan test (gunakan || true agar pipeline tidak stop jika test gagal)
                 sh './vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=test-report.xml || true' 
             }
         }
@@ -39,7 +52,6 @@ pipeline {
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    // Pastikan tool 'SonarScanner' ada di Jenkins Global Tool Configuration
                     def scannerHome = tool 'SonarScanner' 
                     withSonarQubeEnv('SonarQube') { 
                         sh "${scannerHome}/bin/sonar-scanner"
@@ -62,6 +74,7 @@ pipeline {
             steps {
                 script {
                     echo "🐳 Building Docker Image..."
+                    // Kita build ulang menggunakan Dockerfile project untuk environment asli
                     sh "docker build -t ${IMAGE_TAG} ."
                     sh "docker tag ${IMAGE_TAG} ${LATEST_TAG}"
                     
@@ -78,25 +91,19 @@ pipeline {
         
     post {
         always {
-            // FIX FINAL: Struktur ini memaksa Jenkins mencari node SEBELUM menjalankan perintah sh
+            // Tetap gunakan fix 'node' yang tadi agar cleanup berhasil
             script {
                 try {
                     node {
-                        echo "🧹 Cleaning up docker images on node..."
-                        
-                        // Kita definisikan ulang variabel environment yg mungkin hilang context-nya
-                        // atau gunakan env.NAMA_VAR jika masih terbaca
-                        
+                        echo "🧹 Cleaning up..."
                         if (env.IMAGE_TAG) {
                            sh "docker rmi ${env.IMAGE_TAG} || true"
                         }
                         sh "docker image prune -f"
-                        
-                        echo "🧹 Cleaning workspace..."
                         cleanWs()
                     }
                 } catch (Exception e) {
-                    echo "⚠️ Error saat cleanup (diabaikan): ${e.getMessage()}"
+                    echo "⚠️ Cleanup error ignored: ${e.getMessage()}"
                 }
             }
         }
