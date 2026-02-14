@@ -47,10 +47,16 @@ pipeline {
             }
         }
 
-        stage('3. SonarQube Analysis') {
+       stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    echo "📡 Menyiapkan SonarScanner Universal (Fixed Path)..."
+                    echo "📡 Menyiapkan SonarScanner Universal..."
+                    
+                    // 1. Dapatkan User ID & Group ID asli dari Jenkins (Host)
+                    def jenkinsUid = sh(returnStdout: true, script: 'id -u').trim()
+                    def jenkinsGid = sh(returnStdout: true, script: 'id -g').trim()
+                    
+                    echo "👤 Jenkins User ID: ${jenkinsUid}, Group ID: ${jenkinsGid}"
                     
                     withSonarQubeEnv('SonarQube') { 
                         sh """
@@ -61,18 +67,15 @@ pipeline {
                             -e SONAR_TOKEN="\${SONAR_AUTH_TOKEN}" \
                             eclipse-temurin:17-jdk \
                             sh -c "
-                                # 1. Install Unzip & Curl
+                                # A. Install Dependencies
                                 apt-get update && apt-get install -y unzip curl && \
                                 
-                                # 2. Download Scanner
+                                # B. Setup Scanner
                                 curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006.zip && \
                                 unzip -q /tmp/sonar-scanner.zip -d /opt && \
-                                
-                                # 3. RENAME folder hasil extract (INI PERBAIKANNYA)
-                                # Apapun nama foldernya, kita ubah jadi /opt/sonar-scanner
                                 mv /opt/sonar-scanner-* /opt/sonar-scanner && \
                                 
-                                # 4. Jalankan Scanner (Panggil path baru)
+                                # C. Jalankan Scanner
                                 echo '🚀 Starting Scan...' && \
                                 /opt/sonar-scanner/bin/sonar-scanner \
                                 -Dsonar.projectKey=${APP_NAME} \
@@ -80,8 +83,11 @@ pipeline {
                                 -Dsonar.host.url=\${SONAR_HOST_URL} \
                                 -Dsonar.login=\${SONAR_TOKEN} && \
                                 
-                                # 5. Fix Permissions
-                                chown -R \$(id -u):\$(id -g) .scannerwork
+                                # D. FIX PERMISSIONS (CRITICAL!)
+                                # Kita ubah pemilik folder .scannerwork menjadi User ID Jenkins asli
+                                # supaya Jenkins bisa membacanya setelah container mati.
+                                echo '🔓 Fixing permissions for User ID ${jenkinsUid}...' && \
+                                chown -R ${jenkinsUid}:${jenkinsGid} .scannerwork
                             "
                         """
                     }
