@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_USER  = "hakm2002"
+        DOCKER_USER  = "dockerdevopsethos"
         APP_NAME     = "sistem-pakar-stunting"
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
@@ -47,21 +47,21 @@ pipeline {
             }
         }
 
-        // --- FIX STAGE 3 MENGGUNAKAN DOCKER ---
+        // --- STAGE 3 (FIXED FOR ARM64/RASPBERRY PI) ---
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    echo "📡 Menjalankan SonarScanner via Docker..."
+                    echo "📡 Menjalankan SonarScanner (ARM64 Compatible)..."
                     
-                    // Pastikan nama 'SonarQube' di dalam kurung ini SAMA PERSIS 
-                    // dengan nama Server yang ada di 'Manage Jenkins -> System -> SonarQube servers'
+                    // Kita GANTI image 'sonarsource/sonar-scanner-cli' (Intel Only)
+                    // MENJADI 'mwizner/sonar-scanner' (Support ARM & Intel)
                     withSonarQubeEnv('SonarQube') { 
                         sh """
                             docker run --rm \
                             -v "${WORKSPACE}:/usr/src" \
                             -e SONAR_HOST_URL="\${SONAR_HOST_URL}" \
                             -e SONAR_TOKEN="\${SONAR_AUTH_TOKEN}" \
-                            sonarsource/sonar-scanner-cli
+                            mwizner/sonar-scanner
                         """
                     }
                 }
