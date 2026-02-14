@@ -7,19 +7,19 @@ pipeline {
     environment {
         // --- CONFIG ---
         DOCKER_USER  = "dockerdevopsethos"
-        APP_NAME     = "php-datapooling-develop" // Sesuaikan nama app
+        APP_NAME     = "sistem-pakar-stunting" // Sesuaikan nama app
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
         
         // --- SERVER TUJUAN ---
         DEPLOY_USER  = "root"
-        DEPLOY_HOST  = "89.21.85.2" 
-        DEPLOY_DIR   = "/var/www/Datapooling.ethos.co.id/DatapoolingPHP"
+        DEPLOY_HOST  = "192.168.68.200" 
+        //DEPLOY_DIR   = "/var/www/Datapooling.ethos.co.id/DatapoolingPHP"
         
         // --- CREDENTIALS ID ---
-        DOCKER_CREDS = credentials('docker-hub-login')
-        ENV_SECRET   = credentials('datapooling-php-env-file') // Pastikan ID ini ada di Jenkins
-        SSH_CREDS_ID = 'ssh-server-deploy'
+        DOCKER_CREDS = credentials('dockerhub-id-hakm')
+        ENV_SECRET   = credentials('sistem-pakar-stunting') // Pastikan ID ini ada di Jenkins
+        // SSH_CREDS_ID = 'ssh-server-deploy'
     }
 
     stages {
