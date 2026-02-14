@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // --- CONFIG ---
-        DOCKER_USER  = "hakm2002"
+        DOCKER_USER  = "dockerdevopsethos"
         APP_NAME     = "sistem-pakar-stunting"
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
@@ -27,18 +26,16 @@ pipeline {
         stage('2. Install Dependencies & Test') {
             steps {
                 script {
-                    echo "🚀 Memaksa Docker Run secara Manual..."
+                    // --- PENANDA BAHWA KODE BARU SUDAH JALAN ---
+                    echo "==========================================="
+                    echo "DEBUG: SAYA SUDAH MENGGUNAKAN KODE BARU"
+                    echo "DEBUG: AKAN MENJALANKAN DOCKER RUN..."
+                    echo "==========================================="
                     
-                    // --- PENJELASAN TEKNIS ---
-                    // Kita tidak menggunakan 'php -v' langsung.
-                    // Kita menggunakan 'docker run' untuk meminjam environment composer sebentar.
-                    // --rm : Hapus container setelah selesai (biar bersih)
-                    // -v ${WORKSPACE}:/app : Masukkan kodingan kita ke dalam container
-                    // -w /app : Masuk ke folder kodingan di dalam container
-                    // composer:2 : Nama image docker yang punya PHP
-                    
+                    // Kita jalankan perintah PHP di dalam container Docker secara manual
+                    // Perhatikan syntax docker run di bawah ini
                     sh """
-                        docker run --rm --user \$(id -u):\$(id -g) \
+                        docker run --rm \
                         -v ${WORKSPACE}:/app \
                         -w /app \
                         composer:2 \
@@ -91,16 +88,12 @@ pipeline {
         always {
             script {
                 try {
-                    // Node block wajib ada untuk cleanup
                     node {
                         echo "🧹 Cleaning up..."
                         if (env.IMAGE_TAG) {
                            sh "docker rmi ${env.IMAGE_TAG} || true"
                         }
                         sh "docker image prune -f"
-                        
-                        // Perintah ini mungkin butuh sudo jika permission file dari docker run tadi salah
-                        // Tapi kita sudah pakai --user $(id -u) di atas, jadi aman.
                         cleanWs()
                     }
                 } catch (Exception e) {
