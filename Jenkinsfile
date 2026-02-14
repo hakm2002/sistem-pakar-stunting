@@ -47,49 +47,37 @@ pipeline {
             }
         }
 
-       stage('3. SonarQube Analysis') {
+       // --- STAGE 3: DIRECT EXECUTION (NO DOCKER) ---
+        stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    echo "📡 Menjalankan SonarScanner (Mode: Brutal Permissions)..."
+                    echo "📡 Menjalankan SonarScanner (Direct Mode - Menggunakan Java Jenkins)..."
                     
-                    withSonarQubeEnv('SonarQube') { 
+                    withSonarQubeEnv('SonarQube') {
                         sh """
-                            # Hapus folder .scannerwork lama jika ada (untuk scan bersih)
-                            rm -rf .scannerwork
-
-                            docker run --rm \
-                            -v "${WORKSPACE}:/usr/src" \
-                            -w /usr/src \
-                            -e SONAR_HOST_URL="\${SONAR_HOST_URL}" \
-                            -e SONAR_TOKEN="\${SONAR_AUTH_TOKEN}" \
-                            eclipse-temurin:17-jdk \
-                            sh -c "
-                                # 1. Install Unzip & Curl
-                                apt-get update >/dev/null && apt-get install -y unzip curl >/dev/null && \
-                                
-                                # 2. Download Scanner & Rename
-                                curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006.zip && \
-                                unzip -q /tmp/sonar-scanner.zip -d /opt && \
-                                mv /opt/sonar-scanner-* /opt/sonar-scanner && \
-                                
-                                # 3. Jalankan Scanner
-                                echo '🚀 Starting Scan...' && \
-                                /opt/sonar-scanner/bin/sonar-scanner \
-                                -Dsonar.projectKey=${APP_NAME} \
-                                -Dsonar.sources=. \
-                                -Dsonar.host.url=\${SONAR_HOST_URL} \
-                                -Dsonar.login=\${SONAR_TOKEN} && \
-                                
-                                # 4. FIX PERMISSIONS (NUCLEAR OPTION)
-                                # Ubah permission jadi 777 (Read/Write/Execute untuk SEMUA USER)
-                                # Ini menjamin Jenkins 100% bisa baca file report-task.txt
-                                chmod -R 777 .scannerwork
-                            "
+                            # 1. Bersihkan sisa scan sebelumnya
+                            rm -rf .scannerwork sonar-scanner
+                            
+                            # 2. Download Scanner Generic (Hanya Script, tanpa Java bawaan)
+                            # Versi ini ringan dan otomatis memakai Java dari Jenkins (Support ARM64)
+                            echo "⬇️ Downloading Scanner..."
+                            curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006.zip
+                            
+                            # 3. Extract
+                            unzip -q sonar-scanner.zip
+                            mv sonar-scanner-5.0.1.3006 sonar-scanner
+                            
+                            # 4. Berikan izin eksekusi
+                            chmod +x sonar-scanner/bin/sonar-scanner
+                            
+                            # 5. Jalankan Scanner
+                            echo "🚀 Starting Scan..."
+                            ./sonar-scanner/bin/sonar-scanner \
+                            -Dsonar.projectKey=${APP_NAME} \
+                            -Dsonar.sources=. \
+                            -Dsonar.host.url=\${SONAR_HOST_URL} \
+                            -Dsonar.login=\${SONAR_TOKEN}
                         """
-                        
-                        // DEBUG: Cek apakah file benar-benar ada dan bisa dibaca Jenkins
-                        sh "ls -la .scannerwork"
-                        sh "cat .scannerwork/report-task.txt"
                     }
                 }
             }
