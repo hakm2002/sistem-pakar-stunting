@@ -28,10 +28,10 @@ pipeline {
                 cleanWs()
                 checkout([
                     $class: 'GitSCM', 
-                    branches: [[name: '*/develop']], 
+                    branches: [[name: '*/main']], 
                     userRemoteConfigs: [[
-                        url: 'git@github.com:Datapooling-Ethos/DatapoolingPHP.git',
-                        credentialsId: 'ssh-server-deploy'
+                        url: 'git@github.com:hakm2002/sistem-pakar-stunting.git',
+                        //credentialsId: 'ssh-server-deploy'
                     ]]
                 ])
             }
@@ -61,7 +61,7 @@ pipeline {
             steps {
                 script {
                     def scannerHome = tool 'SonarScanner' 
-                    withSonarQubeEnv('SonarQube-Server') { 
+                    withSonarQubeEnv('SonarQube') { 
                         // Di PHP, pastikan sonar-project.properties sudah menunjuk ke coverage.xml
                         sh "${scannerHome}/bin/sonar-scanner"
                     }
@@ -88,7 +88,7 @@ pipeline {
                     sh "docker build -t ${IMAGE_TAG} ."
                     sh "docker tag ${IMAGE_TAG} ${LATEST_TAG}"
                     
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-login', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-id-hakm', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
                         sh "echo $PASS | docker login -u $USER --password-stdin"
                         sh "docker push ${IMAGE_TAG}"
                         sh "docker push ${LATEST_TAG}"
