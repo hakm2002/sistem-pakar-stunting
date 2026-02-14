@@ -2,23 +2,17 @@ pipeline {
     agent any
 
     environment {
-        // --- KONFIGURASI UMUM ---
-        DOCKER_USER  = "dockerdevopsethos"
+        DOCKER_USER  = "hakm2002"
         APP_NAME     = "sistem-pakar-stunting"
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
-        
-        // --- ID KREDENSIAL ---
-        // Pastikan ID ini ada di Jenkins Credentials
         DOCKER_CREDS = credentials('dockerhub-id-hakm')
-        // SONAR_TOKEN = credentials('sonar-token') // Jika diperlukan nanti
     }
 
     stages {
-        // --- STAGE 1: CHECKOUT CODE ---
         stage('1. Checkout') {
             steps {
-                cleanWs() // Bersihkan workspace sebelum mulai
+                cleanWs()
                 checkout([
                     $class: 'GitSCM', 
                     branches: [[name: '*/main']], 
@@ -29,47 +23,55 @@ pipeline {
             }
         }
 
-        // --- STAGE 2: INSTALL & TEST (FIXED) ---
-        // Menggunakan 'docker run' manual agar tidak tergantung plugin Docker Pipeline
         stage('2. Install Dependencies & Test') {
             steps {
                 script {
-                    echo "🚀 Menjalankan PHP Environment via Docker Container..."
+                    echo "🚀 Menjalankan PHP Environment..."
                     
-                    // --rm: Hapus container setelah selesai
-                    // --user: Samakan user ID agar file yang dibuat bisa dihapus Jenkins
-                    // -v: Mount workspace Jenkins ke dalam container
+                    // Logic: Cek dulu apakah ada composer.json
+                    // Jika ada, install. Jika tidak, skip.
                     sh """
                         docker run --rm --user \$(id -u):\$(id -g) \
                         -v ${WORKSPACE}:/app \
                         -w /app \
                         composer:2 \
-                        sh -c "php -v && \
-                               composer install --ignore-platform-reqs --no-interaction --prefer-dist && \
-                               ./vendor/bin/phpunit || true"
+                        sh -c "
+                            php -v
+                            if [ -f composer.json ]; then
+                                echo '📦 Found composer.json, installing dependencies...'
+                                composer install --ignore-platform-reqs --no-interaction --prefer-dist
+                                ./vendor/bin/phpunit || true
+                            else
+                                echo '⚠️ No composer.json found. Skipping composer install & tests.'
+                            fi
+                        "
                     """
                 }
             }
         }
 
-        // --- STAGE 3: SONARQUBE ---
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    // Pastikan tool 'SonarScanner' sudah terinstall di Global Tool Configuration
-                    def scannerHome = tool 'SonarScanner' 
-                    withSonarQubeEnv('SonarQube') { 
-                        sh "${scannerHome}/bin/sonar-scanner"
+                    // PENTING: Pastikan Anda sudah setting Tool 'SonarScanner' di Manage Jenkins -> Tools
+                    // Sesuai langkah No.1 di panduan saya.
+                    try {
+                        def scannerHome = tool 'SonarScanner' 
+                        withSonarQubeEnv('SonarQube') { 
+                            sh "${scannerHome}/bin/sonar-scanner"
+                        }
+                    } catch (Exception e) {
+                        echo "❌ ERROR: Tool 'SonarScanner' tidak ditemukan."
+                        echo "👉 Harap ke Manage Jenkins -> Tools -> Add SonarQube Scanner -> Beri nama 'SonarScanner'"
+                        error("Pipeline Stopped: SonarScanner Tool missing")
                     }
                 }
             }
         }
 
-        // --- STAGE 4: QUALITY GATE ---
         stage('4. Quality Gate') {
             steps {
                 script {
-                    // Tunggu hasil analisis (timeout 2 menit)
                     timeout(time: 2, unit: 'MINUTES') {
                         waitForQualityGate abortPipeline: true
                     }
@@ -77,7 +79,6 @@ pipeline {
             }
         }
 
-        // --- STAGE 5: BUILD & PUSH DOCKER ---
         stage('5. Build & Push Docker') {
             steps {
                 script {
@@ -94,22 +95,6 @@ pipeline {
                 }
             }
         }
-
-        // --- STAGE 6: DEPLOY (COMMENTED OUT) ---
-        // Aktifkan bagian ini jika ingin melakukan deployment (misal via SSH)
-        /*
-        stage('6. Deploy to Staging') {
-            steps {
-                script {
-                    echo "🚀 Deploying to Server..."
-                    // Contoh command deploy via SSH:
-                    // sshagent(['ssh-credentials-id']) {
-                    //     sh "ssh user@server 'docker pull ${LATEST_TAG} && docker-compose up -d'"
-                    // }
-                }
-            }
-        }
-        */
     }
         
     post {
@@ -118,14 +103,10 @@ pipeline {
                 try {
                     node {
                         echo "🧹 Cleaning up..."
-                        // Hapus image spesifik build ini untuk menghemat disk
                         if (env.IMAGE_TAG) {
                            sh "docker rmi ${env.IMAGE_TAG} || true"
                         }
-                        // Hapus dangling images (image sampah)
                         sh "docker image prune -f"
-                        
-                        // Bersihkan workspace file
                         cleanWs()
                     }
                 } catch (Exception e) {
@@ -134,10 +115,10 @@ pipeline {
             }
         }
         success {
-            echo "✅ Pipeline Selesai: Build & Push Berhasil!"
+            echo "✅ Pipeline Selesai!"
         }
         failure {
-            echo "❌ Pipeline Gagal. Silakan cek log di atas."
+            echo "❌ Pipeline Gagal."
         }
     }
 }
