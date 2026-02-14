@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // --- CONFIG ---
-        DOCKER_USER  = "dockerdevopsethos"
+        DOCKER_USER  = "hakm2002"
         APP_NAME     = "sistem-pakar-stunting"
         IMAGE_TAG    = "${DOCKER_USER}/${APP_NAME}:${BUILD_NUMBER}"
         LATEST_TAG   = "${DOCKER_USER}/${APP_NAME}:latest"
@@ -39,6 +39,7 @@ pipeline {
         stage('3. SonarQube Analysis') {
             steps {
                 script {
+                    // Pastikan tool 'SonarScanner' ada di Jenkins Global Tool Configuration
                     def scannerHome = tool 'SonarScanner' 
                     withSonarQubeEnv('SonarQube') { 
                         sh "${scannerHome}/bin/sonar-scanner"
@@ -77,24 +78,26 @@ pipeline {
         
     post {
         always {
-            // --- PERBAIKAN UTAMA DI SINI ---
-            // Kita bungkus SEMUA perintah post dengan 'node'
-            // Ini menjamin 'sh' dan 'cleanWs' punya workspace/FilePath
-            node {
-                script {
-                    echo "🧹 Cleaning up..."
-                    try {
-                        // Pastikan variabel ada sebelum dipakai
+            // FIX FINAL: Struktur ini memaksa Jenkins mencari node SEBELUM menjalankan perintah sh
+            script {
+                try {
+                    node {
+                        echo "🧹 Cleaning up docker images on node..."
+                        
+                        // Kita definisikan ulang variabel environment yg mungkin hilang context-nya
+                        // atau gunakan env.NAMA_VAR jika masih terbaca
+                        
                         if (env.IMAGE_TAG) {
-                            sh "docker rmi ${IMAGE_TAG} || true"
+                           sh "docker rmi ${env.IMAGE_TAG} || true"
                         }
                         sh "docker image prune -f"
-                    } catch (Exception e) {
-                        echo "⚠️ Cleanup warning: ${e.getMessage()}"
+                        
+                        echo "🧹 Cleaning workspace..."
+                        cleanWs()
                     }
+                } catch (Exception e) {
+                    echo "⚠️ Error saat cleanup (diabaikan): ${e.getMessage()}"
                 }
-                // cleanWs() sekarang aman karena berada di dalam 'node'
-                cleanWs()
             }
         }
         success {
