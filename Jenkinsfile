@@ -47,21 +47,25 @@ pipeline {
             }
         }
 
-        // --- STAGE 3 (FIXED FOR ARM64/RASPBERRY PI) ---
+        // --- STAGE 3 (FIXED: ARM64 SUPPORT) ---
         stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    echo "📡 Menjalankan SonarScanner (ARM64 Compatible)..."
+                    echo "📡 Menjalankan SonarScanner (Image: cirepo - ARM64 Support)..."
                     
-                    // Kita GANTI image 'sonarsource/sonar-scanner-cli' (Intel Only)
-                    // MENJADI 'mwizner/sonar-scanner' (Support ARM & Intel)
+                    // Kita gunakan image 'cirepo/sonar-scanner-cli' yang support ARM64
+                    // Kita juga tambahkan parameter manual (-D) agar scan jalan meski tidak ada sonar-project.properties
                     withSonarQubeEnv('SonarQube') { 
                         sh """
                             docker run --rm \
                             -v "${WORKSPACE}:/usr/src" \
                             -e SONAR_HOST_URL="\${SONAR_HOST_URL}" \
                             -e SONAR_TOKEN="\${SONAR_AUTH_TOKEN}" \
-                            mwizner/sonar-scanner
+                            cirepo/sonar-scanner-cli \
+                            -Dsonar.projectKey=${APP_NAME} \
+                            -Dsonar.sources=. \
+                            -Dsonar.host.url="\${SONAR_HOST_URL}" \
+                            -Dsonar.login="\${SONAR_AUTH_TOKEN}"
                         """
                     }
                 }
