@@ -47,37 +47,37 @@ pipeline {
             }
         }
 
-       // --- STAGE 3: DIRECT EXECUTION (NO DOCKER) ---
-        stage('3. SonarQube Analysis') {
+       stage('3. SonarQube Analysis') {
             steps {
                 script {
-                    echo "📡 Menjalankan SonarScanner (Direct Mode - Menggunakan Java Jenkins)..."
+                    echo "📡 Menjalankan SonarScanner (Mode Ringan - No SCM)..."
                     
                     withSonarQubeEnv('SonarQube') {
                         sh """
-                            # 1. Bersihkan sisa scan sebelumnya
+                            # 1. Bersihkan
                             rm -rf .scannerwork sonar-scanner
                             
-                            # 2. Download Scanner Generic (Hanya Script, tanpa Java bawaan)
-                            # Versi ini ringan dan otomatis memakai Java dari Jenkins (Support ARM64)
-                            echo "⬇️ Downloading Scanner..."
+                            # 2. Download Scanner
                             curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006.zip
-                            
-                            # 3. Extract
                             unzip -q sonar-scanner.zip
                             mv sonar-scanner-5.0.1.3006 sonar-scanner
-                            
-                            # 4. Berikan izin eksekusi
                             chmod +x sonar-scanner/bin/sonar-scanner
                             
-                            # 5. Jalankan Scanner
+                            # 3. Jalankan Scanner dengan Opsi Hemat Resource
                             echo "🚀 Starting Scan..."
                             ./sonar-scanner/bin/sonar-scanner \
                             -Dsonar.projectKey=${APP_NAME} \
                             -Dsonar.sources=. \
                             -Dsonar.host.url=\${SONAR_HOST_URL} \
-                            -Dsonar.login=\${SONAR_TOKEN}
+                            -Dsonar.token=\${SONAR_TOKEN} \
+                            -Dsonar.scm.disabled=true \
+                            -Dsonar.cpd.exclusions=**/* \
+                            -Dsonar.branch.autoconfig.disabled=true
                         """
+                        // Penjelasan Flag Baru:
+                        // -Dsonar.scm.disabled=true        -> JANGAN cek history Git (Hemat RAM besar!)
+                        // -Dsonar.cpd.exclusions=**/* -> JANGAN cek duplikasi kode (Hemat CPU)
+                        // -Dsonar.token=...                -> Menggantikan sonar.login yang deprecated
                     }
                 }
             }
