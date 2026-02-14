@@ -10,13 +10,6 @@ pipeline {
         
         // --- CREDENTIALS ID ---
         DOCKER_CREDS = credentials('dockerhub-id-hakm')
-        
-        // --- DEPLOY CONFIG (DI-SKIP DULU UNTUK LOCAL TEST) ---
-        // DEPLOY_USER  = "root"
-        // DEPLOY_HOST  = "192.168.68.200" 
-        // DEPLOY_DIR   = "/var/www/sistem-pakar-stunting"
-        // ENV_SECRET   = credentials('sistem-pakar-stunting') 
-        // SSH_CREDS_ID = 'ssh-server-deploy' 
     }
 
     stages {
@@ -38,7 +31,7 @@ pipeline {
                 sh 'php -v'
                 sh 'composer -V'
                 sh 'composer install --no-interaction --prefer-dist --optimize-autoloader'
-                // Gunakan "|| true" agar pipeline tidak berhenti total jika unit test gagal saat development
+                // Menggunakan "|| true" agar pipeline tidak berhenti jika test gagal
                 sh './vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=test-report.xml || true' 
             }
         }
@@ -80,19 +73,18 @@ pipeline {
                 }
             }
         }
-        
-        // Stage 6 Deploy di-skip dulu sesuai request
     }
         
     post {
         always {
-            // --- FIX UTAMA DISINI ---
-            // Kita bungkus dengan 'node' agar sh command punya konteks tempat berjalan
+            // --- PERBAIKAN UTAMA DI SINI ---
+            // Kita bungkus SEMUA perintah post dengan 'node'
+            // Ini menjamin 'sh' dan 'cleanWs' punya workspace/FilePath
             node {
                 script {
                     echo "🧹 Cleaning up..."
                     try {
-                        // Cek apakah image tag ada isinya sebelum menghapus
+                        // Pastikan variabel ada sebelum dipakai
                         if (env.IMAGE_TAG) {
                             sh "docker rmi ${IMAGE_TAG} || true"
                         }
@@ -101,7 +93,7 @@ pipeline {
                         echo "⚠️ Cleanup warning: ${e.getMessage()}"
                     }
                 }
-                // cleanWs() juga butuh node context
+                // cleanWs() sekarang aman karena berada di dalam 'node'
                 cleanWs()
             }
         }
