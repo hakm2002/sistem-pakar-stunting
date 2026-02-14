@@ -27,20 +27,22 @@ pipeline {
         stage('2. Install Dependencies & Test') {
             steps {
                 script {
-                    echo "🚀 Menjalankan PHP & Composer menggunakan Docker Container (Manual)..."
+                    echo "🚀 Memaksa Docker Run secara Manual..."
                     
-                    // --- PERUBAHAN UTAMA DI SINI ---
-                    // Kita jalankan container 'composer:2' secara manual
-                    // -v ${WORKSPACE}:/app  -> Mapping folder project Jenkins ke folder /app di container
-                    // -w /app               -> Masuk ke folder /app
-                    // sh -c "..."           -> Jalankan perintah php & composer
+                    // --- PENJELASAN TEKNIS ---
+                    // Kita tidak menggunakan 'php -v' langsung.
+                    // Kita menggunakan 'docker run' untuk meminjam environment composer sebentar.
+                    // --rm : Hapus container setelah selesai (biar bersih)
+                    // -v ${WORKSPACE}:/app : Masukkan kodingan kita ke dalam container
+                    // -w /app : Masuk ke folder kodingan di dalam container
+                    // composer:2 : Nama image docker yang punya PHP
                     
                     sh """
                         docker run --rm --user \$(id -u):\$(id -g) \
                         -v ${WORKSPACE}:/app \
                         -w /app \
                         composer:2 \
-                        sh -c "php -v && composer -V && composer install --ignore-platform-reqs --no-interaction --prefer-dist && ./vendor/bin/phpunit || true"
+                        sh -c "php -v && composer install --ignore-platform-reqs --no-interaction --prefer-dist && ./vendor/bin/phpunit || true"
                     """
                 }
             }
@@ -89,12 +91,16 @@ pipeline {
         always {
             script {
                 try {
+                    // Node block wajib ada untuk cleanup
                     node {
                         echo "🧹 Cleaning up..."
                         if (env.IMAGE_TAG) {
                            sh "docker rmi ${env.IMAGE_TAG} || true"
                         }
                         sh "docker image prune -f"
+                        
+                        // Perintah ini mungkin butuh sudo jika permission file dari docker run tadi salah
+                        // Tapi kita sudah pakai --user $(id -u) di atas, jadi aman.
                         cleanWs()
                     }
                 } catch (Exception e) {
